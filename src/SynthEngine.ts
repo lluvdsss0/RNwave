@@ -59,11 +59,11 @@ const rockAndRollRiff: Array<RiffStep | null> = [
 ];
 
 const drumSamplePaths = [
-  "/audio/drums/kick.flac",
-  "/audio/drums/snare.flac",
-  "/audio/drums/closed-hihat.flac",
-  "/audio/drums/tom.flac",
-  "/audio/drums/crash.flac",
+  "audio/drums/kick.flac",
+  "audio/drums/snare.flac",
+  "audio/drums/closed-hihat.flac",
+  "audio/drums/tom.flac",
+  "audio/drums/crash.flac",
 ];
 
 const riffSustain = 0.32;
@@ -287,9 +287,36 @@ export class SynthEngine {
     const context = this.getContext();
     const samples = await Promise.all(
       drumSamplePaths.map(async (path) => {
-        const response = await fetch(new URL(path, document.baseURI));
-        if (!response.ok) throw new Error(`Unable to load drum sample (${response.status}): ${path}`);
-        return context.decodeAudioData(await response.arrayBuffer());
+        const url = new URL(`${import.meta.env.BASE_URL}${path}`, document.baseURI);
+        let response: Response;
+        try {
+          response = await fetch(url);
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          throw new Error(`Unable to request drum sample at ${url.href} (HTTP status unavailable): ${detail}`);
+        }
+        if (!response.ok) {
+          throw new Error(`Unable to load drum sample at ${url.href} (HTTP ${response.status}).`);
+        }
+
+        const contentType = response.headers.get("content-type") || "unknown content type";
+        let audioData: ArrayBuffer;
+        try {
+          audioData = await response.arrayBuffer();
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          throw new Error(
+            `Unable to read drum sample at ${url.href} (HTTP ${response.status}): ${detail}`,
+          );
+        }
+        try {
+          return await context.decodeAudioData(audioData);
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          throw new Error(
+            `decodeAudioData failed for drum sample at ${url.href} (HTTP ${response.status}, ${contentType}): ${detail}`,
+          );
+        }
       }),
     );
     this.drumBuffers = samples;

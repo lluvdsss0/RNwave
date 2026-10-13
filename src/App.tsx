@@ -29,6 +29,13 @@ const notes: Record<string, number> = {
 
 const keyboard = ["A", "W", "S", "E", "D", "F", "T", "G", "Y", "H", "U", "J", "K"];
 const waveTypes: WaveType[] = ["pulse", "sawtooth", "sine", "triangle"];
+const drumKeys: Record<string, number> = {
+  d: 0,
+  r: 1,
+  u: 2,
+  m: 3,
+  s: 4,
+};
 
 function BlinkingText({ children }: { children: string }) {
   return <span className="device-copy__blink">{children}</span>;
@@ -158,6 +165,23 @@ export default function App() {
     [engine],
   );
 
+  const playDrum = useCallback(
+    (instrument: number) => {
+      setDrumHits((count) => count + 1);
+      window.setTimeout(() => setDrumHits((count) => Math.max(0, count - 1)), 260);
+      void engine
+        .triggerDrum(instrument)
+        .then(() => {
+          setAudioError("");
+          setAnalyser(engine.analyser);
+        })
+        .catch((error: unknown) =>
+          setAudioError(error instanceof Error ? error.message : "Unable to play drum."),
+        );
+    },
+    [engine],
+  );
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -166,9 +190,11 @@ export default function App() {
         (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName) ||
           event.target.isContentEditable)
       ) return;
-      if (notes[event.key.toLowerCase()]) {
+      const key = event.key.toLowerCase();
+      if (notes[key] || drumKeys[key] !== undefined) {
         event.preventDefault();
-        playNote(event.key);
+        if (notes[key]) playNote(event.key);
+        if (drumKeys[key] !== undefined) playDrum(drumKeys[key]);
       }
     };
     const onKeyUp = (event: KeyboardEvent) => {
@@ -188,7 +214,7 @@ export default function App() {
       window.removeEventListener("blur", onBlur);
       activeNotesRef.current.forEach((key) => engine.stopNote(key));
     };
-  }, [engine, playNote, releaseNote]);
+  }, [engine, playDrum, playNote, releaseNote]);
 
   const changeWave = (type: WaveType) => {
     setWaveType(type);
@@ -259,19 +285,7 @@ export default function App() {
             setDrumValue(value);
             engine.setDrumVolume(value);
           }}
-          onHit={(instrument) => {
-            setDrumHits((count) => count + 1);
-            window.setTimeout(() => setDrumHits((count) => Math.max(0, count - 1)), 260);
-            void engine
-              .triggerDrum(instrument)
-              .then(() => {
-                setAudioError("");
-                setAnalyser(engine.analyser);
-              })
-              .catch((error: unknown) =>
-                setAudioError(error instanceof Error ? error.message : "Unable to play drum."),
-              );
-          }}
+          onHit={playDrum}
         />
       </div>
 
