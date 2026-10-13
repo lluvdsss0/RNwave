@@ -59,11 +59,11 @@ const rockAndRollRiff: Array<RiffStep | null> = [
 ];
 
 const drumSamplePaths = [
-  "audio/drums/kick.flac",
-  "audio/drums/snare.flac",
-  "audio/drums/closed-hihat.flac",
-  "audio/drums/tom.flac",
-  "audio/drums/crash.flac",
+  `${import.meta.env.BASE_URL}audio/drums/kick.flac`,
+  `${import.meta.env.BASE_URL}audio/drums/snare.flac`,
+  `${import.meta.env.BASE_URL}audio/drums/closed-hihat.flac`,
+  `${import.meta.env.BASE_URL}audio/drums/tom.flac`,
+  `${import.meta.env.BASE_URL}audio/drums/crash.flac`,
 ];
 
 const riffSustain = 0.32;
@@ -287,7 +287,7 @@ export class SynthEngine {
     const context = this.getContext();
     const samples = await Promise.all(
       drumSamplePaths.map(async (path) => {
-        const url = new URL(`${import.meta.env.BASE_URL}${path}`, document.baseURI);
+        const url = new URL(path, document.baseURI);
         let response: Response;
         try {
           response = await fetch(url);
