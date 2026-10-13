@@ -1,0 +1,123 @@
+/* Match the reference canvas proportions while keeping the controls responsive. */
+:root,
+body {
+  background: #151515;
+}
+
+.synth-shell {
+  height: 100vh;
+  min-height: 520px;
+  aspect-ratio: auto;
+  background: #151515;
+}
+
+.left-controls {
+  top: 8.4%;
+  gap: 4px;
+}
+
+.analog-slider__label {
+  line-height: 0.98;
+}
+
+.drum-position {
+  top: 8.4%;
+}
+
+.drum-module {
+  margin-top: 8px;
+}
+
+.drum-node {
+  background: #151515;
+}
+
+.wave-position {
+  top: 14.8%;
+}
+
+.knob-bank {
+  bottom: 10%;
+}
+
+.wave-selector {
+  top: 46%;
+  width: 16.2%;
+}
+
+.wave-selector h2 {
+  margin-bottom: 19px;
+}
+
+.device-copy {
+  bottom: 5%;
+}
+
+.soul-copy {
+  bottom: 5%;
+}
+
+.synth-shell:hover .keyboard {
+  opacity: 0;
+}
+
+.keyboard:focus-within {
+  opacity: 1;
+}
+
+.synth-shell:hover .keyboard-hint {
+  opacity: 0;
+}
+
+.keyboard:focus-within + .keyboard-hint {
+  opacity: 1;
+}
+
+@media (max-width: 700px) {
+  .synth-shell {
+    height: max(100svh, 720px);
+    min-height: 720px;
+  }
+
+  .left-controls {
+    top: 105px;
+    gap: 8px;
+  }
+
+  .drum-position {
+    top: 105px;
+  }
+
+  .drum-module {
+    margin-top: 11px;
+  }
+
+  .wave-position {
+    top: 39%;
+  }
+
+  .knob-bank {
+    bottom: 100px;
+  }
+
+  .wave-selector {
+    top: 42%;
+    width: 28%;
+  }
+
+  .wave-selector h2 {
+    margin-bottom: 10px;
+  }
+
+  .device-copy {
+    bottom: 20px;
+  }
+
+  .soul-copy {
+    bottom: 23px;
+  }
+
+  .synth-shell:hover .keyboard {
+    opacity: 0.72;
+  }
+}
