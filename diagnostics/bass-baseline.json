@@ -1,0 +1,26 @@
+{
+  "levels": [
+    {
+      "wave": "triangle",
+      "rms": 0.03692558639158278,
+      "peak": 0.16418364644050598
+    },
+    {
+      "wave": "square",
+      "rms": 0.039327497159462745,
+      "peak": 0.2581978440284729
+    },
+    {
+      "wave": "pulse",
+      "rms": 0.030799936055335684,
+      "peak": 0.20354782044887543
+    },
+    {
+      "wave": "sawtooth",
+      "rms": 0.033820885183927646,
+      "peak": 0.34193146228790283
+    }
+  ],
+  "scoreHash": "397b0e86e20afcb56f4f0c46dbbda67cd6c43ec0bae38002d77645ac6ac0c0d4",
+  "tone": "{\n    peak: 0.62,\n    sub: 0.22,\n    output: 0.76,\n    cutoffMin: 75,\n    cutoffMax: 6500,\n    lowCut: 22,\n    pan: -0.28,\n    chorusRate: 0.27,\n    delayTime: 60 / FIXED_TEMPO / 2,\n  }"
+}

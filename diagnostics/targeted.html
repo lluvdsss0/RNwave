@@ -1,0 +1,65 @@
+<!doctype html><pre id="result">running</pre><script type="module">
+import {AudioEngine,PHRASE_STEPS} from '../src/audio.js';
+const controls=[];
+const waves=['triangle','square','pulse','sawtooth'],results=[];
+async function render(Engine,ids,selection){
+ const ctx=new OfflineAudioContext(2,Math.ceil(48000*(PHRASE_STEPS*60/112/4+1.5)),48000);globalThis.AudioContext=function(){return ctx;};
+ const e=new Engine();e.getContext();e.analyser.disconnect();e.analyser.connect(ctx.destination);
+ for(const id of ids){e.enabledVoices.add(id);e.buses.get(id).gate.gain.value=1;e.setWave(id,selection[id]);}
+ if(ids.length===2)for(let id=0;id<5;id++)e.enabledDrums.add(id);
+ const saved=setTimeout;globalThis.setTimeout=()=>0;
+ try{for(let step=0;step<PHRASE_STEPS;step++)e.scheduleStep(step,.05+step*e.stepDuration());}finally{globalThis.setTimeout=saved;}
+ const b=await ctx.startRendering();let sum=0,peak=0;
+ for(let c=0;c<2;c++)for(const v of b.getChannelData(c)){if(!Number.isFinite(v))throw Error('Invalid audio');sum+=v*v;peak=Math.max(peak,Math.abs(v));}
+ return {rms:Math.sqrt(sum/(b.length*2)),peak};
+}
+async function staged(wave){
+ const stepTime=60/112/4,phrase=PHRASE_STEPS*stepTime;
+ const ctx=new OfflineAudioContext(2,Math.ceil((3*phrase+1.5)*48000),48000);
+ globalThis.AudioContext=function(){return ctx;};
+ const e=new AudioEngine();e.getContext();e.enabledVoices.add(1);e.buses.get(1).gate.gain.value=1;
+ e.setWave(1,'triangle');e.setWave(2,wave);
+ const saved=setTimeout;globalThis.setTimeout=()=>0;
+ try{for(let step=0;step<PHRASE_STEPS*3;step++){
+  const time=.05+step*stepTime;
+  if(step===PHRASE_STEPS){e.enabledVoices.add(2);e.buses.get(2).gate.gain.setTargetAtTime(1,time,.012);}
+  if(step===PHRASE_STEPS*2){for(let id=0;id<5;id++)e.enabledDrums.add(id);e.pendingPatterns[2]=10;}
+  e.scheduleStep(step%PHRASE_STEPS,time);
+ }}finally{globalThis.setTimeout=saved;}
+ const b=await ctx.startRendering(),cycles=[];let peak=0;
+ for(let cycle=0;cycle<3;cycle++){
+  let sum=0,p=0,count=0;
+  for(let ch=0;ch<2;ch++){const data=b.getChannelData(ch);for(let i=Math.floor(cycle*phrase*48000);i<Math.floor((cycle+1)*phrase*48000);i++){sum+=data[i]**2;p=Math.max(p,Math.abs(data[i]));count++;}}
+  cycles.push({cycle,layers:cycle===0?'bass':cycle<2?'bass+upper':'bass+upper+drums',rms:Math.sqrt(sum/count),peak:p});peak=Math.max(peak,p);
+ }
+ return {staged:wave,cycles,peak,rms:cycles.at(-1).rms};
+}
+const stats=data=>{let sum=0,peak=0;for(const v of data){sum+=v*v;peak=Math.max(peak,Math.abs(v));}return {rms:Math.sqrt(sum/data.length),peak};};
+async function probe(id,wave,name,value){
+ const ctx=new OfflineAudioContext(2,48000*2.2,48000);globalThis.AudioContext=function(){return ctx;};
+ const e=new AudioEngine();e.setParameter(id,name,value);e.getContext();e.analyser.disconnect();e.analyser.connect(ctx.destination);
+ const bus=e.buses.get(id);bus.gate.gain.value=1;bus.driveWet.gain.value=0;bus.driveDry.gain.value=1;bus.chorusSend.gain.value=0;bus.delaySend.gain.value=0;
+ e.setWave(id,wave);const note=e.playNote(id,id===1?100:200,.8,.02,.7);
+ const automation=note.parts[0].timeline,cutoff=bus.filter.frequency.value,settings=e.envelopeTimes(id);
+ const b=await ctx.startRendering(),data=b.getChannelData(0);
+ const windowStats=(a,z)=>stats(data.slice(Math.floor(a*48000),Math.floor(z*48000)));
+ const held=data.slice(.3*48000,.65*48000);let diff=0;for(let i=1;i<held.length;i++)diff+=(held[i]-held[i-1])**2;
+ return {id,wave,name,value,cutoff,settings,automation,stop:note.stop,frequency:note.oscillators[0].frequency.value,
+ early:windowStats(.02,.07).rms,held:windowStats(.55,.68).rms,tail:windowStats(.92,1.08).rms,
+ brightness:Math.sqrt(diff/held.length)/(stats(held).rms||1),peak:stats(data).peak};
+}
+try{
+ for(const wave of waves)results.push({bass:wave,...await render(AudioEngine,[1],{1:wave})});
+ for(const wave of waves)results.push({upper:wave,...await render(AudioEngine,[2],{2:wave})});
+ for(const bass of waves)for(const upper of waves)results.push({mix:[bass,upper],...await render(AudioEngine,[1,2],{1:bass,2:upper})});
+ results.push(await staged('sawtooth'));
+ if(results.some(r=>r.peak>=.95||r.rms===0))throw Error('Silent or clipping mix');
+ for(const id of [1,2])for(const name of ['attack','sustain','release','cutoff'])for(const value of (name==='sustain'?[1,5,10]:[0,.5,1]))controls.push(await probe(id,id===1?'triangle':'sawtooth',name,value));
+ for(const id of [1,2]){
+  const get=name=>controls.filter(c=>c.id===id&&c.name===name);
+  const a=get('attack'),r=get('release'),u=get('sustain'),c=get('cutoff');
+  if(!(a[0].early>a[1].early&&a[1].early>a[2].early&&r[0].tail<r[1].tail&&r[1].tail<r[2].tail&&u[0].held<u[1].held&&u[1].held<u[2].held&&c[2].brightness>c[0].brightness*1.05))throw Error('Control range failed');
+ }
+ document.querySelector('#result').textContent=JSON.stringify({ok:true,results,controls});
+}catch(e){document.querySelector('#result').textContent=JSON.stringify({ok:false,error:e.stack,results,controls});}
+</script>

@@ -1,10 +1,5 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import ReferenceKnobArtwork from "./ReferenceKnobArtwork";
 
 interface KnobProps {
   label: string;
@@ -12,21 +7,9 @@ interface KnobProps {
   onChange: (value: number) => void;
 }
 
+const LAST_STEP = 10;
 const KNOB_START_ANGLE = 22;
 const DEGREES_PER_STEP = 35;
-const LAST_STEP = 10;
-
-const numberAngles = Array.from({ length: LAST_STEP }, (_, index) => {
-  const angle = KNOB_START_ANGLE + index * DEGREES_PER_STEP;
-  const radians = (angle * Math.PI) / 180;
-  const rotation = angle > 180 ? angle - 360 : angle;
-  return {
-    number: index + 1,
-    left: `${50 + Math.sin(radians) * 39}%`,
-    top: `${50 - Math.cos(radians) * 39}%`,
-    rotate: `${rotation}deg`,
-  };
-});
 
 function clampStep(value: number) {
   return Math.min(LAST_STEP, Math.max(1, Math.round(value)));
@@ -41,6 +24,7 @@ interface DragState {
 }
 
 export default function Knob({ label, value, onChange }: KnobProps) {
+  const displayLabel = label[0].toUpperCase() + label.slice(1);
   const drag = useRef<DragState | null>(null);
   const faceRef = useRef<HTMLButtonElement>(null);
   const [dragStep, setDragStep] = useState<number | null>(null);
@@ -69,9 +53,7 @@ export default function Knob({ label, value, onChange }: KnobProps) {
     drag.current = {
       centerX,
       centerY,
-      lastAngle:
-        Math.atan2(event.clientY - centerY, event.clientX - centerX) *
-        (180 / Math.PI),
+      lastAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX) * (180 / Math.PI),
       position: displayStep - 1,
       lastStep: displayStep,
     };
@@ -81,12 +63,10 @@ export default function Knob({ label, value, onChange }: KnobProps) {
     const currentDrag = drag.current;
     if (!currentDrag) return;
 
-    const pointerAngle =
-      Math.atan2(
-        event.clientY - currentDrag.centerY,
-        event.clientX - currentDrag.centerX,
-      ) *
-      (180 / Math.PI);
+    const pointerAngle = Math.atan2(
+      event.clientY - currentDrag.centerY,
+      event.clientX - currentDrag.centerX,
+    ) * (180 / Math.PI);
     let angleDelta = pointerAngle - currentDrag.lastAngle;
     if (angleDelta > 180) angleDelta -= 360;
     if (angleDelta < -180) angleDelta += 360;
@@ -100,9 +80,9 @@ export default function Knob({ label, value, onChange }: KnobProps) {
 
     const nextStep = clampStep(currentDrag.position + 1);
     if (nextStep === currentDrag.lastStep) return;
+
     currentDrag.lastStep = nextStep;
     setDragStep(nextStep);
-
     onChange(nextStep);
   }
 
@@ -118,7 +98,7 @@ export default function Knob({ label, value, onChange }: KnobProps) {
         className="knob__face"
         type="button"
         role="slider"
-        aria-label={`${label} ${step}`}
+        aria-label={`${displayLabel} ${step}`}
         aria-valuemin={1}
         aria-valuemax={LAST_STEP}
         aria-valuenow={step}
@@ -128,22 +108,11 @@ export default function Knob({ label, value, onChange }: KnobProps) {
         onPointerCancel={onPointerEnd}
         onLostPointerCapture={onPointerEnd}
         onKeyDown={(event) => {
-          if (event.key === "ArrowUp" || event.key === "ArrowRight")
-            onChange(Math.min(LAST_STEP, step + 1));
-          if (event.key === "ArrowDown" || event.key === "ArrowLeft")
-            onChange(Math.max(1, step - 1));
+          if (event.key === "ArrowUp" || event.key === "ArrowRight") onChange(Math.min(LAST_STEP, step + 1));
+          if (event.key === "ArrowDown" || event.key === "ArrowLeft") onChange(Math.max(1, step - 1));
         }}
       >
-        {numberAngles.map(({ number, left, top, rotate }) => (
-          <span
-            className="knob__number"
-            key={number}
-            style={{ left, top, transform: `translate(-50%, -50%) rotate(${rotate})` }}
-            aria-hidden="true"
-          >
-            {number}
-          </span>
-        ))}
+        <ReferenceKnobArtwork label={label} />
         <span className="knob__inner" aria-hidden="true" />
         <span
           className="knob__rotor"
@@ -151,7 +120,7 @@ export default function Knob({ label, value, onChange }: KnobProps) {
           aria-hidden="true"
         >
           <span className="knob__pointer" />
-          <span className="knob__label">{label}</span>
+          <span className="knob__label">{displayLabel}</span>
         </span>
       </button>
     </div>

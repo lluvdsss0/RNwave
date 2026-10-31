@@ -1,0 +1,3 @@
+<!doctype html><pre id="result">running</pre><script type="module">
+document.querySelector('#result').textContent=JSON.stringify(await fetch('./render-report.json').then(r=>r.json()));
+</script>

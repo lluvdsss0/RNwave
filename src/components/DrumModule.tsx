@@ -1,49 +1,64 @@
+import type { KeyboardEvent } from "react";
+import referenceSvg, { scopeReferenceMarkup } from "../referenceSvg";
+import { drumPatterns } from "../audio.js";
+
 interface DrumModuleProps {
-  value: number;
-  onChange: (value: number) => void;
-  onHit: (instrument: number) => void;
+  active: boolean[];
+  step: number;
+  onToggle: (instrument: number) => void;
 }
 
-const instruments = [
-  { letter: "d", name: "kick", className: "drum-node--kick" },
-  { letter: "r", name: "snare", className: "drum-node--snare" },
-  { letter: "u", name: "closed hi-hat", className: "drum-node--tom" },
-  { letter: "m", name: "tom", className: "drum-node--cymbal" },
-  { letter: "s", name: "crash", className: "drum-node--rim" },
-];
+const referenceLines = referenceSvg.split(/\r?\n/);
+const referenceDefs = referenceSvg.match(/<defs>[\s\S]*?<\/defs>/)?.[0] ?? "";
 
-export default function DrumModule({ value, onChange, onHit }: DrumModuleProps) {
+// These are the original vector nodes at the bottom of the reference SVG:
+// the white five-circle “Drums” mark and its outlined letterforms. Keeping
+// the source paths as SVG preserves the masks and the two referenced glyphs.
+const drumArtwork = scopeReferenceMarkup(`${referenceDefs}${referenceLines.slice(15, 31).join("\n")}`, "drums");
+
+const instruments = [
+  { name: "Kick", cx: 667.085, cy: 871.085 },
+  { name: "Snare", cx: 752.772, cy: 926.17 },
+  { name: "Tom", cx: 840.5, cy: 871.085 },
+  { name: "Closed hi-hat", cx: 926.188, cy: 926.17 },
+  { name: "Crash", cx: 1013.92, cy: 871.085 },
+] as const;
+
+function handleKeyDown(event: KeyboardEvent<SVGGElement>, onToggle: () => void) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  onToggle();
+}
+
+export default function DrumModule({ active, step, onToggle }: DrumModuleProps) {
   return (
-    <section className="drum-section" aria-label="Drum module">
-      <label className="analog-slider analog-slider--right drum-section__slider">
-        <span className="analog-slider__label">drums volume</span>
-        <input
-          aria-label="drums volume"
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={value}
-          onChange={(event) => onChange(Number(event.currentTarget.value))}
+    <section className="drum-position" aria-label="Drums">
+      <svg
+        className="drum-module"
+        viewBox="616 816 453 166"
+        role="group"
+        aria-label="Drum layers"
+      >
+        <g
+          className="drum-reference-art"
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: drumArtwork }}
         />
-      </label>
-      <div className="drum-module">
-        <svg className="drum-module__wires" viewBox="0 0 540 190" aria-hidden="true">
-          <path d="M70 63 L170 115 L270 63 L370 115 L470 63" />
-          <path d="M70 63 L270 63 L470 63" />
-        </svg>
         {instruments.map((instrument, index) => (
-          <button
+          <g
+            className={`drum-hit ${active[index] ? "is-active" : ""} ${active[index] && drumPatterns[index].includes(step) ? "is-hit" : ""}`}
             key={instrument.name}
-            type="button"
-            className={`drum-node ${instrument.className}`}
-            aria-label={`Play ${instrument.name}`}
-            onClick={() => onHit(index)}
+            role="button"
+            tabIndex={0}
+            aria-label={`${active[index] ? "Disable" : "Enable"} ${instrument.name}`}
+            aria-pressed={active[index]}
+            onClick={() => onToggle(index)}
+            onKeyDown={(event) => handleKeyDown(event, () => onToggle(index))}
           >
-            <span className="drum-node__letter">{instrument.letter}</span>
-          </button>
+            <circle cx={instrument.cx} cy={instrument.cy} r="42" />
+          </g>
         ))}
-      </div>
+      </svg>
     </section>
   );
 }

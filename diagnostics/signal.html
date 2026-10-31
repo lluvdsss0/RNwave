@@ -1,0 +1,48 @@
+<!doctype html><html><body><pre id="result">running</pre><script type="module">
+import {AudioEngine,PHRASE_STEPS} from '../src/audio.js';
+const results=[],envelopes=[],controls=[];
+const waves=['pulse','square','triangle','sawtooth'];
+const stats=data=>{let sum=0,peak=0;for(const v of data){if(!Number.isFinite(v))throw Error('Non-finite audio');sum+=v*v;peak=Math.max(peak,Math.abs(v));}return {rms:Math.sqrt(sum/data.length),peak};};
+async function render(ids,wave,sustain=5,dry=false,drums=false,switching=false,probeDuration=0,stress=false){
+ const ctx=new OfflineAudioContext(2,Math.ceil(48000*(probeDuration?1:PHRASE_STEPS*60/112/4+1.5)),48000);
+ globalThis.AudioContext=function(){return ctx;};
+ const e=new AudioEngine(); e.getContext();e.analyser.disconnect();
+ (probeDuration?e.buses.get(ids[0]).input:e.analyser).connect(ctx.destination);
+ for(const id of ids){const b=e.buses.get(id);b.gate.gain.value=1;e.enabledVoices.add(id);e.setWave(id,typeof wave==='string'?wave:wave[id]);if(stress)for(const [key,value] of Object.entries({volume:1,cutoff:1,drive:10,sub:10,release:1,attack:0}))e.setParameter(id,key,value);e.setParameter(id,'sustain',sustain);
+  if(dry){b.driveWet.gain.value=0;b.driveDry.gain.value=1;b.chorusSend.gain.value=0;b.delaySend.gain.value=0;}
+ }
+ if(drums)for(let i=0;i<5;i++)e.enabledDrums.add(i);
+ const savedTimeout=globalThis.setTimeout;globalThis.setTimeout=()=>0;
+ try{if(probeDuration)e.playNote(ids[0],100,.8,.02,probeDuration);else for(let step=0;step<PHRASE_STEPS;step++){if(switching)for(const id of ids)e.setWave(id,waves[Math.floor(step/4)%4]);e.scheduleStep(step,.05+step*e.stepDuration());}}finally{globalThis.setTimeout=savedTimeout;}
+ const buffer=await ctx.startRendering();const data=buffer.getChannelData(0);
+ if(probeDuration){const attack=e.envelopeTimes(ids[0]).attack;return {level:stats(data.slice(Math.floor((.02+probeDuration-.04)*48000),Math.floor((.02+probeDuration-.01)*48000))),attack:Array.from(data.slice(960,960+Math.floor(attack*48000))),peak:stats(data).peak};}
+ const right=stats(buffer.getChannelData(1));const mono=Float32Array.from(data,(v,i)=>(v+buffer.getChannelData(1)[i])/2);return {...stats(data),rightRms:right.rms,monoRms:stats(mono).rms,peak:Math.max(stats(data).peak,right.peak)};
+}
+async function probe(id,wave,name,value){
+ const ctx=new OfflineAudioContext(2,48000*2.2,48000);globalThis.AudioContext=function(){return ctx;};
+ const e=new AudioEngine();e.setParameter(id,name,value);e.getContext();e.analyser.disconnect();e.analyser.connect(ctx.destination);
+ const bus=e.buses.get(id);bus.gate.gain.value=1;bus.driveWet.gain.value=0;bus.driveDry.gain.value=1;bus.chorusSend.gain.value=0;bus.delaySend.gain.value=0;
+ e.setWave(id,wave);const note=e.playNote(id,id===1?100:200,.8,.02,.7);
+ const automation=note.parts[0].timeline,cutoff=bus.filter.frequency.value,settings=e.envelopeTimes(id);
+ const b=await ctx.startRendering(),data=b.getChannelData(0);
+ const windowStats=(a,z)=>stats(data.slice(Math.floor(a*48000),Math.floor(z*48000)));
+ const held=data.slice(.3*48000,.65*48000);let diff=0;for(let i=1;i<held.length;i++)diff+=(held[i]-held[i-1])**2;
+ return {id,wave,name,value,cutoff,settings,automation,stop:note.stop,frequency:note.oscillators[0].frequency.value,
+ early:windowStats(.02,.07).rms,held:windowStats(.55,.68).rms,tail:windowStats(.92,1.08).rms,
+ brightness:Math.sqrt(diff/held.length)/(stats(held).rms||1),peak:stats(data).peak};
+}
+try{
+ for(const id of [1,2])for(const wave of waves)for(const sustain of [1,5,10])for(const dry of [true,false])results.push({id,wave,sustain,dry,...await render([id],wave,sustain,dry)});
+ for(const wave of waves)for(const sustain of [1,5,10])results.push({both:wave,sustain,...await render([1,2],wave,sustain,false,true)});
+ for(const bass of waves)for(const upper of waves)if(bass!==upper)results.push({mixed:[bass,upper],...await render([1,2],{1:bass,2:upper},5,false,true)});
+ for(const wave of waves)results.push({stress:wave,...await render([1,2],wave,10,false,true,false,0,true)});
+ results.push({switching:true,...await render([1,2],'square',5,false,true,true)});
+ for(const id of [1,2])for(const duration of [60/112/4,60/112/2]){
+  const probes=[];for(const sustain of [1,5,10])probes.push({sustain,...await render([id],'square',sustain,true,false,false,duration)});
+  const attackDifference=Math.max(...probes[0].attack.map((v,i)=>Math.abs(v-probes[2].attack[i])));
+  envelopes.push({id,duration,attackDifference,levels:probes.map(p=>({sustain:p.sustain,...p.level}))});
+ }
+ for(const id of [1,2])for(const wave of waves)for(const name of ['attack','sustain','release','cutoff'])for(const value of (name==='sustain'?[1,5,10]:[0,.5,1]))controls.push(await probe(id,wave,name,value));
+ document.querySelector('#result').textContent=JSON.stringify({ok:true,results,envelopes,controls});
+}catch(error){document.querySelector('#result').textContent=JSON.stringify({ok:false,error:error.stack,results,envelopes,controls});}
+</script></body></html>

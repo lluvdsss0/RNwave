@@ -1,0 +1,25 @@
+<!doctype html><pre id="result">running</pre><script type="module">
+import {AudioEngine} from '../src/audio.js';
+const results=[];
+try{
+ for(const id of [1,2]){
+  const ctx=new OfflineAudioContext(2,48000*2.2,48000);
+  globalThis.AudioContext=function(){return ctx;};
+  const e=new AudioEngine();e.setParameter(id,'attack',1);e.getContext();
+  const b=e.buses.get(id);b.gate.gain.value=1;
+  b.driveWet.gain.value=0;b.driveDry.gain.value=1;b.chorusSend.gain.value=0;b.delaySend.gain.value=0;
+  const note=e.playNote(id,id===1?100:200,.8,.02,.7);
+  const first=ctx.suspend(.15),second=ctx.suspend(.3);
+  const rendering=ctx.startRendering();await first;
+  const before=note.parts[0].gain.gain.value;
+  for(const [name,value] of Object.entries({attack:0,sustain:10,release:1,cutoff:0}))e.setParameter(id,name,value);
+  const timeline=note.parts[0].timeline,stop=note.stop;
+  await ctx.resume();await second;
+  const after=note.parts[0].gain.gain.value,cutoff=b.filter.frequency.value;
+  await ctx.resume();const buffer=await rendering;
+  const data=buffer.getChannelData(0);let tail=0;for(let i=48000;i<48000*1.2;i++)tail+=data[i]**2;
+  results.push({id,before,after,cutoff,target:e.cutoffFrequency(id,0),timeline,stop,tailRms:Math.sqrt(tail/(48000*.2))});
+ }
+ document.querySelector('#result').textContent=JSON.stringify({ok:true,results});
+}catch(e){document.querySelector('#result').textContent=JSON.stringify({ok:false,error:e.stack});}
+</script>
